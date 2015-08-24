@@ -1,0 +1,29 @@
+{
+  "name": "houmio-driver-dmx",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/houmio/houmio-driver-dmx.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/houmio/houmio-driver-dmx/issues"
+  },
+  "homepage": "https://github.com/houmio/houmio-driver-dmx#readme",
+  "dependencies": {
+    "async": "^1.4.2",
+    "baconjs": "^0.7.71",
+    "carrier": "^0.2.1",
+    "ffi": "git+https://github.com/kjunichi/node-ffi.git#bad796888ad564bbc6a15b73579223b8f118605e",
+    "net": "^1.0.2",
+    "ramda": "^0.17.1",
+    "serialport": "^1.7.4",
+    "zerofill": "^0.1.0"
+  }
+}

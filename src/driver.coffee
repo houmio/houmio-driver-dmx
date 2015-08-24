@@ -1,8 +1,19 @@
 SerialPort = require('serialport').SerialPort
 R = require('ramda')
 zerofill = require('zerofill')
+net = require('net')
+Bacon = require('baconjs')
+async = require('async')
+carrier = require('carrier')
 
+bridgeDmxSocket = new net.Socket()
+houmioBridge = process.env.HOUMIO_BRIDGE || "localhost:3001"
 
+dmxUniverseLength = 30
+
+dmxUniverse = R.map () ->
+		return 0x00
+, R.range(0, dmxUniverseLength)
 
 
 
@@ -18,30 +29,45 @@ serialPort = new SerialPort "/dev/cu.usbmodem1451", {
 tempVal =0
 serialPort.on 'open', ()->
 	console.log "OPEN", toHex 12
-	setInterval writeToDmx, 1000
-
 	serialPort.on 'data', (data)->
 		console.log "Data", data
 
+dataLenToTwoByte = (len)-> [(len&0xFF), (tempVal&0xFF00)>>8]
 
-writeToDmx = () ->
-	dmxUniverse = R.map () ->
-		return 0x00
+doWriteToDmx = (message) ->
+  dmxUniverse[parseInt(message.data.protocolAddress)] = message.data.bri
 
-	, R.range(0, 32)
-	#dmxUniverse[0] =
-	#dmxUniverse[1] = 0
-	dmxUniverse[1] = 215
-	dmxUniverse[2] = 128
+  dmxPkt = R.concat([0x7e, 0x06], dataLenToTwoByte dmxUniverseLength).concat(dmxUniverse).concat([0xe7])
+  console.log "KULLI", dmxPkt
+  serialPort.write dmxPkt, (err, res) ->
 
-	dmxUniverse = R.concat([0x7e, 0x06, 32, 0x00], dmxUniverse).concat [0xe7]
+isWriteMessage = (message) -> message.command is "write"
 
-	#tempValHi = (tempVal&0xff00)>>8
-	#tempValLo = (tempVal&0xff)
+toLines = (socket) ->
+  Bacon.fromBinder (sink) ->
+    carrier.carry socket, sink
+    socket.on "close", -> sink new Bacon.End()
+    socket.on "error", (err) -> sink new Bacon.Error(err)
+    ( -> )
 
-	#dmxUniverse = [0x01, 0x18, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3B, 0x10, 0x10, 0x9C, 0x8E, 0xFE, 0x05, 0x01, 0x00, 0x00, 0x00, 0x10, 0x00, 0x03, 0x00, 0x09, 0x7B]
-		#dmxUniverse[3]=0
-	console.log "dmxUniverse", R.map toHex, dmxUniverse
-	serialPort.write dmxUniverse, (err, res)->
-		console.log("KULLI", res, tempVal++)
-###
+openBridgeWriteMessageStream = (socket, protocolName) -> (cb) ->
+  socket.connect houmioBridge.split(":")[1], houmioBridge.split(":")[0], ->
+    lineStream = toLines socket
+    messageStream = lineStream.map JSON.parse
+    messageStream.onEnd -> exit "Bridge stream ended, protocol: #{protocolName}"
+    messageStream.onError (err) -> exit "Error from bridge stream, protocol: #{protocolName}, error: #{err}"
+    writeMessageStream = messageStream.filter isWriteMessage
+    cb null, writeMessageStream
+
+openStreams = [openBridgeWriteMessageStream(bridgeDmxSocket, "DMX")]
+
+async.series openStreams, (err, [dmxWriteMessages]) ->
+  if err then exit err
+
+  dmxWriteMessages
+    .onValue doWriteToDmx
+
+
+  bridgeDmxSocket.write (JSON.stringify { command: "driverReady", protocol: "enttecdmx"}) + "\n"
+
+
