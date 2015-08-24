@@ -38,7 +38,7 @@ doWriteToDmx = (message) ->
   dmxUniverse[parseInt(message.data.protocolAddress)] = message.data.bri
 
   dmxPkt = R.concat([0x7e, 0x06], dataLenToTwoByte dmxUniverseLength).concat(dmxUniverse).concat([0xe7])
-  console.log "KULLI", dmxPkt
+  console.log "Write to DMX", dmxPkt
   serialPort.write dmxPkt, (err, res) ->
 
 isWriteMessage = (message) -> message.command is "write"

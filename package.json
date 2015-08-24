@@ -20,7 +20,6 @@
     "async": "^1.4.2",
     "baconjs": "^0.7.71",
     "carrier": "^0.2.1",
-    "ffi": "git+https://github.com/kjunichi/node-ffi.git#bad796888ad564bbc6a15b73579223b8f118605e",
     "net": "^1.0.2",
     "ramda": "^0.17.1",
     "serialport": "^1.7.4",
