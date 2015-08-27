@@ -75,14 +75,13 @@ openBridgeWriteMessageStream = (socket, protocolName) -> (cb) ->
 openStreams = [openBridgeWriteMessageStream(bridgeDmxAcSocket, "DMX"),
               openBridgeWriteMessageStream(bridgeDmxWinchSocket, "WINCH")]
 
-calculateWinchPosition = (writeMessage) ->
-  top = 255 - writeMessage.data.maxPos
-  bottom = writeMessage.data.minPos
+calculateWinchPosition = (winch) ->
+  top = 255 - winch.data.maxPos
+  bottom = winch.data.minPos
   length = top - bottom
-  Math.floor(length/255*(255-writeMessage.data.bri)) + bottom
+  Math.floor(length/255*(255-winch.data.bri)) + bottom
 
 winchParamsToDmxVals = (winch) ->
-  positionAddress = parseInt(winch.data.protocolAddress)
   _.map [winch.data.position,
     winch.data.finePosition,
     winch.data.speed,
@@ -90,7 +89,7 @@ winchParamsToDmxVals = (winch) ->
     winch.data.minPos,
     winch.data.findUp,
     winch.data.findDown], (val, i) ->
-      {'addr': positionAddress + i, 'val': val}
+      {'addr': winch.data.startAddress + i, 'val': val}
 
 parseWinchParams = (winch) ->
   winch.data.universeAddress = winch.data.protocolAddress.split('/')[0]
@@ -98,7 +97,7 @@ parseWinchParams = (winch) ->
   winch.data.maxPos = parseInt winch.data.protocolAddress.split('/')[3]
   winch.data.minPos = parseInt winch.data.protocolAddress.split('/')[4]
   winch.data.position = calculateWinchPosition winch
-  winch.data.protocolAddress = winch.data.protocolAddress.split('/')[1]
+  winch.data.startAddress = parseInt winch.data.protocolAddress.split('/')[1]
   winch.data.findDown = 0
   winch.data.finePosition = 0
   winch.data.findUp = 0
@@ -122,7 +121,8 @@ async.series openStreams, (err, [acWriteMessages, winchWriteMessages]) ->
   if err then exit err
 
   Bacon.update(
-    [],
+    []
+    ,
     acWriteMessages, (driverState, x) ->
       idEquals = R.pathEq ['data', '_id']
       index = R.findIndex idEquals(x.data._id), driverState
@@ -143,6 +143,7 @@ async.series openStreams, (err, [acWriteMessages, winchWriteMessages]) ->
   ).map (driverState) ->
     universe = R.repeat 0x00, dmxUniverseLength
     deviceStateRegisterArray = createLightArrayFromState driverState
+    console.log deviceStateRegisterArray
     f = (x) ->universe[x.addr] = x.val
     R.forEach f, deviceStateRegisterArray
     universe
