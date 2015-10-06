@@ -10,41 +10,37 @@ _ = require('lodash')
 bridgeDmxAcSocket = new net.Socket()
 bridgeDmxWinchSocket = new net.Socket()
 houmioBridge = process.env.HOUMIO_BRIDGE || "localhost:3001"
+houmioDmxSerialPort = process.env.DMX_PORT || "/dev/cu.usbserial-EN174525"
 
 dmxUniverseLength = 30
 
 dmxDataStream = new Bacon.Bus()
 
-
-doWriteToDmx = (writeMessageArray) ->
-  console.log "KULLIII", writeMessageArray
-
-
+exit = (msg) ->
+  console.log msg
+  process.exit 1
 
 toHex = (val) ->
 	R.concat '0x', zerofill parseInt(val).toString(16), 2
 
-serialPort = new SerialPort "/dev/cu.usbmodem1411", {
+serialPort = new SerialPort houmioDmxSerialPort, {
   'baudrate': 115200,
   'databits': 8,
   'stopbits': 1,
   'parity'  : 'none',
 }
 
-
-
-
 serialPort.on 'open', ()->
 	console.log "OPEN", toHex 12
 	serialPort.on 'data', (data)->
 		console.log "Data", data
-
 
 dataLenToTwoByte = (len)-> [(len&0xFF), (len&0xFF00)>>8]
 
 doWriteToDmx = (dmxUniverse) ->
   dmxPkt = R.concat([0x7e, 0x06], dataLenToTwoByte dmxUniverseLength).concat(dmxUniverse).concat([0xe7])
   serialPort.write dmxPkt, (err, res) ->
+    if err then exit err
 
 parseLightParams = (light) ->
   if light.data.type is 'color'
@@ -52,7 +48,6 @@ parseLightParams = (light) ->
       {'addr': parseInt(light.data.protocolAddress)+index, 'val': val}
   else
     return [{'addr': parseInt(light.data.protocolAddress), 'val': light.data.bri}]
-
 
 isWriteMessage = (message) -> message.command is "write"
 
@@ -117,15 +112,30 @@ createLightArrayFromState = (driverState) ->
       else return parseLightParams(device)
   R.flatten R.map(f, driverState)
 
+
+createLightSlideMessages = (message) ->
+  time = 5
+
+
+
 async.series openStreams, (err, [acWriteMessages, winchWriteMessages]) ->
   if err then exit err
 
+  acMessageStream = new Bacon.Bus()
+
   Bacon.update(
     []
-    ,
-    acWriteMessages, (driverState, x) ->
+    acMessageStream, (driverState, x) ->
+      if !x.time
+        x.time = 5
+
+
       idEquals = R.pathEq ['data', '_id']
       index = R.findIndex idEquals(x.data._id), driverState
+      if x.time > 0
+        x.time -= 1
+        console.log x
+        #Bacon.later(5000, x).onValue (val) -> acMessageStream.push(val)
       if index is -1
         R.append x, driverState
       else
@@ -149,10 +159,10 @@ async.series openStreams, (err, [acWriteMessages, winchWriteMessages]) ->
     universe
   .onValue (dmxUniverse) -> doWriteToDmx dmxUniverse
 
-  winchWriteMessages
-    .flatMap (m) ->
+  acWriteMessages
+    .onValue (m) -> acMessageStream.push(m)
 
-  bridgeDmxWinchSocket.write (JSON.stringify { command: "driverReady", protocol: "enttecdmx/winch"}) + "\n"
-  bridgeDmxAcSocket.write (JSON.stringify { command: "driverReady", protocol: "enttecdmx/ac"}) + "\n"
+  bridgeDmxWinchSocket.write (JSON.stringify { command: "driverReady", protocol: "dmx/winch"}) + "\n"
+  bridgeDmxAcSocket.write (JSON.stringify { command: "driverReady", protocol: "dmx/ac"}) + "\n"
 
 
