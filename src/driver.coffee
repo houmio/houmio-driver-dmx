@@ -7,10 +7,12 @@ async = require('async')
 carrier = require('carrier')
 cc = require('./colourConversion')
 _ = require('lodash')
+fs = require('fs')
+
 bridgeDmxAcSocket = new net.Socket()
 bridgeDmxWinchSocket = new net.Socket()
 houmioBridge = process.env.HOUMIO_BRIDGE || "localhost:3001"
-houmioDmxSerialPort = process.env.DMX_PORT || "/dev/cu.usbserial-EN174525"
+houmioDmxSerialStart = process.env.DMX_SERIAL_START || "cu.usbserial-"
 
 dmxUniverseLength = 30
 
@@ -23,7 +25,16 @@ exit = (msg) ->
 toHex = (val) ->
 	R.concat '0x', zerofill parseInt(val).toString(16), 2
 
-serialPort = new SerialPort houmioDmxSerialPort, {
+findDmxSerialPort = () ->
+  deviceFiles = fs.readdirSync('/dev')
+  startsWithDmxSerial = (s) -> new RegExp(houmioDmxSerialStart).test(s)
+  usbSerials = R.filter(startsWithDmxSerial, deviceFiles)
+  prependWithDev = (s) -> '/dev/' + s
+  return R.head(R.map(prependWithDev, usbSerials))
+
+dmxPort = findDmxSerialPort()
+
+serialPort = new SerialPort dmxPort, {
   'baudrate': 115200,
   'databits': 8,
   'stopbits': 1,
@@ -31,7 +42,7 @@ serialPort = new SerialPort houmioDmxSerialPort, {
 }
 
 serialPort.on 'open', ()->
-	console.log "OPEN", toHex 12
+	console.log "Serial Port Opened:", dmxPort
 	serialPort.on 'data', (data)->
 		console.log "Data", data
 
