@@ -12,7 +12,7 @@ fs = require('fs')
 bridgeDmxAcSocket = new net.Socket()
 bridgeDmxWinchSocket = new net.Socket()
 houmioBridge = process.env.HOUMIO_BRIDGE || "localhost:3001"
-houmioDmxSerialStart = process.env.DMX_SERIAL_START || "cu.usbserial-"
+houmioDmxSerialStart = process.env.DMX_SERIAL_START || "ttyUSB"
 
 dmxUniverseLength = 30
 
