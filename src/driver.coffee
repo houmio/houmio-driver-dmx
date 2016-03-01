@@ -14,7 +14,7 @@ bridgeDmxWinchSocket = new net.Socket()
 houmioBridge = process.env.HOUMIO_BRIDGE || "localhost:3001"
 houmioDmxSerialStart = process.env.DMX_SERIAL_START || "ttyUSB"
 
-dmxUniverseLength = 30
+dmxUniverseLength = 510
 
 dmxDataStream = new Bacon.Bus()
 
